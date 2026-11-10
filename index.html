@@ -2,92 +2,161 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Pixel Frogger</title>
+<title>Pixel Frogger — Improved</title>
 <style>
 body { background: #000; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; image-rendering: pixelated; }
-canvas { border: 4px solid #333; image-rendering: pixelated; }
+canvas { border: 6px solid #0a0; image-rendering: pixelated; box-shadow: 0 0 30px #0a08; }
 </style>
 </head>
 <body>
-<canvas id="game" width="400" height="500"></canvas>
+<canvas id="game" width="480" height="560"></canvas>
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
-let frog = {x:180, y:460};
-let cars = [];
-let logs = [];
-let score = 0;
-let frame = 0;
 
-function spawnCars() {
-  for (let lane=0; lane<4; lane++) {
-    cars.push({x: -60, y: 300 + lane*30, speed: 2 + Math.random()*2, dir: lane%2===0?1:-1, w:50});
+let frog, cars, logs, score, best, state, frame;
+
+function init() {
+  frog = {x:220, y:500};
+  cars = []; logs = [];
+  score = 0;
+  best = parseInt(localStorage.getItem('frogBest')||'0');
+  state = 'start';
+  frame = 0;
+  for (let i=0; i<6; i++) spawnCar();
+  for (let i=0; i<4; i++) spawnLog();
+}
+
+function spawnCar() {
+  const lane = Math.floor(Math.random()*4);
+  cars.push({x: Math.random()*500-50, y: 320 + lane*35, speed: 2+Math.random()*2.5, dir: lane%2===0?1:-1, w:55, color: ['#f44','#44f','#fa0','#f0f'][Math.floor(Math.random()*4)]});
+}
+function spawnLog() {
+  const lane = Math.floor(Math.random()*3);
+  logs.push({x: Math.random()*500, y: 60 + lane*45, speed: 1.2+Math.random()*1.5, w:90});
+}
+
+function draw() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0,0,480,560);
+  // Grass
+  ctx.fillStyle = '#0a0';
+  ctx.fillRect(0,0,480,40);
+  ctx.fillRect(0,500,480,60);
+  ctx.fillRect(0,200,480,40);
+  // Water
+  ctx.fillStyle = '#006';
+  ctx.fillRect(0,40,480,160);
+  // Road
+  ctx.fillStyle = '#333';
+  ctx.fillRect(0,240,480,260);
+
+  logs.forEach(l => {
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(l.x, l.y, l.w, 30);
+    ctx.fillStyle = '#654321';
+    ctx.fillRect(l.x+5, l.y+5, l.w-10, 8);
+  });
+  cars.forEach(c => {
+    ctx.fillStyle = c.color;
+    ctx.fillRect(c.x, c.y, c.w, 25);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(c.x+5, c.y+5, 12, 8);
+    ctx.fillRect(c.x+c.w-17, c.y+5, 12, 8);
+  });
+
+  // Frog
+  ctx.fillStyle = '#0f0';
+  ctx.fillRect(frog.x, frog.y, 36, 24);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(frog.x+6, frog.y+4, 6, 6);
+  ctx.fillRect(frog.x+24, frog.y+4, 6, 6);
+
+  ctx.fillStyle = '#fff';
+  ctx.font = '18px monospace';
+  ctx.fillText('Score: '+score+'  Best: '+best, 10, 25);
+
+  if (state === 'start') {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0,0,480,560);
+    ctx.fillStyle = '#0f0';
+    ctx.font = 'bold 36px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('FROGGER', 240, 220);
+    ctx.font = '18px monospace';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('Arrow keys to move', 240, 270);
+    ctx.fillText('SPACE to start', 240, 310);
+  }
+  if (state === 'over') {
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0,0,480,560);
+    ctx.fillStyle = '#f44';
+    ctx.font = 'bold 32px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('GAME OVER', 240, 220);
+    ctx.fillStyle = '#fff';
+    ctx.font = '18px monospace';
+    ctx.fillText('Score: '+score, 240, 270);
+    ctx.fillText('SPACE to retry', 240, 310);
   }
 }
-function spawnLogs() {
-  for (let lane=0; lane<3; lane++) {
-    logs.push({x: 400, y: 80 + lane*40, speed: 1.5 + Math.random(), w:80});
-  }
-}
-spawnCars(); spawnLogs();
 
-function loop() {
+function update() {
+  if (state !== 'play') return;
   frame++;
-  if (frame % 120 === 0) { spawnCars(); spawnLogs(); }
+  if (frame % 100 === 0) spawnCar();
+  if (frame % 140 === 0) spawnLog();
+
   cars.forEach(c => {
     c.x += c.speed * c.dir;
-    if (c.dir>0 && c.x>420) c.x=-60;
-    if (c.dir<0 && c.x<-60) c.x=420;
-    if (frog.x < c.x+c.w && frog.x+30 > c.x && frog.y < c.y+20 && frog.y+20 > c.y) {
-      alert('Splat! Score: '+score); location.reload();
+    if (c.dir>0 && c.x>520) c.x=-60;
+    if (c.dir<0 && c.x<-60) c.x=520;
+    if (frog.x < c.x+c.w-5 && frog.x+36 > c.x+5 && frog.y < c.y+25 && frog.y+24 > c.y) {
+      state = 'over';
     }
   });
   logs.forEach(l => {
     l.x -= l.speed;
-    if (l.x < -100) l.x = 420;
+    if (l.x < -100) l.x = 520;
   });
+
   let onLog = false;
-  if (frog.y < 200) {
+  if (frog.y < 180) {
     logs.forEach(l => {
-      if (frog.x > l.x && frog.x < l.x + l.w && Math.abs(frog.y - l.y) < 20) {
+      if (frog.x+10 > l.x && frog.x+26 < l.x + l.w && Math.abs(frog.y - l.y) < 25) {
         onLog = true;
         frog.x -= l.speed;
       }
     });
-    if (!onLog) { alert('Drowned! Score: '+score); location.reload(); }
+    if (!onLog) state = 'over';
   }
-  if (frog.y < 20) { score += 10; frog.y = 460; frog.x = 180; }
+  if (frog.y < 20) {
+    score += 10;
+    if (score > best) { best = score; localStorage.setItem('frogBest', best); }
+    frog.y = 500; frog.x = 220;
+  }
+}
 
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0,0,400,500);
-  ctx.fillStyle = '#0a0';
-  ctx.fillRect(0,0,400,40);
-  ctx.fillRect(0,460,400,40);
-  ctx.fillRect(0,220,400,60);
-  ctx.fillStyle = '#00f';
-  ctx.fillRect(0,40,400,180);
-  ctx.fillStyle = '#333';
-  ctx.fillRect(0,280,400,180);
-  ctx.fillStyle = '#8B4513';
-  logs.forEach(l => ctx.fillRect(l.x, l.y, l.w, 25));
-  ctx.fillStyle = '#f00';
-  cars.forEach(c => ctx.fillRect(c.x, c.y, c.w, 20));
-  ctx.fillStyle = '#0f0';
-  ctx.fillRect(frog.x, frog.y, 30, 20);
-  ctx.fillStyle = '#fff';
-  ctx.font = '16px monospace';
-  ctx.fillText('Score: '+score, 10, 20);
+function loop() {
+  update();
+  draw();
   requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'ArrowUp') frog.y = Math.max(0, frog.y-30);
-  if (e.key === 'ArrowDown') frog.y = Math.min(470, frog.y+30);
-  if (e.key === 'ArrowLeft') frog.x = Math.max(0, frog.x-30);
-  if (e.key === 'ArrowRight') frog.x = Math.min(370, frog.x+30);
+  if ((state === 'start' || state === 'over') && e.code === 'Space') {
+    init(); state = 'play'; return;
+  }
+  if (state !== 'play') return;
+  if (e.key === 'ArrowUp') frog.y = Math.max(0, frog.y-35);
+  if (e.key === 'ArrowDown') frog.y = Math.min(510, frog.y+35);
+  if (e.key === 'ArrowLeft') frog.x = Math.max(0, frog.x-35);
+  if (e.key === 'ArrowRight') frog.x = Math.min(444, frog.x+35);
 });
 
+init();
 loop();
 </script>
 </body>
